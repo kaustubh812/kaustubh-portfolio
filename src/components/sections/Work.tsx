@@ -37,18 +37,14 @@ export default function Work() {
     const build = () => {
       const w = list.clientWidth;
       const h = list.scrollHeight;
-      // desktop: serpentine between alternating cards; mobile: a gently
-      // wiggling rail in the left gutter beside full-width cards
+      // desktop: serpentine between alternating cards; mobile: a straight
+      // rail in the left gutter beside full-width cards
       const mobile = window.innerWidth < 768;
       const pts = cardRefs.current.map((el, i) => ({
-        x: mobile
-          ? i % 2 === 0
-            ? 13
-            : 23
-          : w * (i % 2 === 0 ? 0.575 : 0.425),
+        x: mobile ? 16 : w * (i % 2 === 0 ? 0.575 : 0.425),
         y: el ? el.offsetTop + el.offsetHeight / 2 : 0,
       }));
-      const startX = mobile ? 18 : w * 0.5;
+      const startX = mobile ? 16 : w * 0.5;
       const all = [{ x: startX, y: -8 }, ...pts, { x: startX, y: h + 8 }];
       let d = `M ${all[0].x} ${all[0].y}`;
       for (let i = 1; i < all.length; i++) {
