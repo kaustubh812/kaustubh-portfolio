@@ -553,6 +553,11 @@ export function buildAgentContext(): string {
     if (pr.agentNotes?.length) {
       lines.push(`Technical depth: ${pr.agentNotes.join(" ")}`);
     }
+    if (pr.links?.length) {
+      lines.push(
+        `Links: ${pr.links.map((l) => `${l.label}: ${l.href}`).join(", ")}`
+      );
+    }
   }
   lines.push(
     ``,

@@ -1,10 +1,112 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Reveal from "@/components/Reveal";
 import { profile } from "@/lib/content";
 
 type Msg = { role: "user" | "assistant"; content: string };
+
+/* ---------- rich text: bold highlights + clickable links/emails ---------- */
+
+const LINK_RE =
+  /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?]|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/g;
+
+function linkify(text: string, keyBase: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  let i = 0;
+  LINK_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LINK_RE.exec(text))) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const token = m[0];
+    const isEmail = token.includes("@") && !token.startsWith("http");
+    out.push(
+      <a
+        key={`${keyBase}-l${i++}`}
+        href={isEmail ? `mailto:${token}` : token}
+        {...(isEmail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+        className="break-all text-acc2 underline decoration-acc/40 underline-offset-2 transition-colors hover:decoration-acc"
+      >
+        {token}
+      </a>
+    );
+    last = m.index + token.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+function inline(text: string, keyBase: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last)
+      out.push(...linkify(text.slice(last, m.index), `${keyBase}-p${i}`));
+    out.push(
+      <strong key={`${keyBase}-b${i}`} className="font-semibold text-ink">
+        {linkify(m[1], `${keyBase}-bi${i}`)}
+      </strong>
+    );
+    i++;
+    last = m.index + m[0].length;
+  }
+  if (last < text.length)
+    out.push(...linkify(text.slice(last), `${keyBase}-t`));
+  return out;
+}
+
+function RichText({ text }: { text: string }) {
+  const blocks = text.split(/\n{2,}/);
+  return (
+    <>
+      {blocks.map((block, bi) => {
+        const lines = block.split("\n").filter((l) => l.trim());
+        const isList =
+          lines.length > 0 && lines.every((l) => /^\s*[-•*]\s+/.test(l));
+        if (isList) {
+          return (
+            <ul key={bi} className={`flex flex-col gap-1.5 ${bi > 0 ? "mt-3" : ""}`}>
+              {lines.map((l, li) => (
+                <li key={li} className="flex gap-2.5">
+                  <span className="mt-[10px] h-1 w-1 flex-none rounded-full bg-acc" />
+                  <span>{inline(l.replace(/^\s*[-•*]\s+/, ""), `${bi}-${li}`)}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={bi} className={bi > 0 ? "mt-3" : ""}>
+            {inline(block, `${bi}`)}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
+/** What the TTS engine reads: markdown markers stripped. */
+function toSpeech(text: string): string {
+  return text.replace(/\*\*/g, "").replace(/^\s*[-•*]\s+/gm, "");
+}
+
+function Equalizer() {
+  return (
+    <span className="flex h-[13px] items-end gap-[3px]" aria-hidden>
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className="eq-bar"
+          style={{ animationDelay: `${i * 130}ms` }}
+        />
+      ))}
+    </span>
+  );
+}
 
 const SUGGESTIONS = [
   "Why should I hire Kaustubh?",
@@ -87,7 +189,7 @@ export default function AgentSection() {
 
   function speak(text: string, onStart?: () => void) {
     if (!("speechSynthesis" in window)) return;
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(toSpeech(text));
     const en = voicesRef.current.filter((v) => v.lang.startsWith("en"));
     u.voice =
       en.find((v) => /natural|online|google/i.test(v.name)) ?? en[0] ?? null;
@@ -290,12 +392,15 @@ export default function AgentSection() {
                   </span>
                 )}
                 {speaking ? (
-                  <button
-                    onClick={stopSpeaking}
-                    className="text-ink transition-colors hover:text-acc2"
-                  >
-                    ■ STOP VOICE
-                  </button>
+                  <span className="flex items-center gap-3">
+                    <Equalizer />
+                    <button
+                      onClick={stopSpeaking}
+                      className="text-ink transition-colors hover:text-acc2"
+                    >
+                      ■ STOP
+                    </button>
+                  </span>
                 ) : (
                   <button
                     onClick={() => setVoiceReplies((v) => !v)}
@@ -336,25 +441,42 @@ export default function AgentSection() {
                 </div>
               )}
 
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={
-                    m.role === "user"
-                      ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-acc/15 px-4 py-3 text-[14.5px] leading-relaxed text-ink"
-                      : "mr-auto max-w-[92%] whitespace-pre-wrap text-[14.5px] leading-[1.8] text-ink2"
-                  }
-                >
-                  {m.content ||
-                    (busy && i === messages.length - 1 ? (
-                      <span className="inline-flex gap-1">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc [animation-delay:150ms]" />
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc [animation-delay:300ms]" />
-                      </span>
-                    ) : null)}
-                </div>
-              ))}
+              {messages.map((m, i) => {
+                const isSpoken =
+                  speaking && m.role === "assistant" && i === messages.length - 1;
+                return (
+                  <div
+                    key={i}
+                    className={
+                      m.role === "user"
+                        ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-acc/15 px-4 py-3 text-[14.5px] leading-relaxed text-ink"
+                        : `relative mr-auto max-w-[92%] text-[14.5px] leading-[1.8] text-ink2 transition-[padding] ${
+                            isSpoken ? "pl-4" : ""
+                          }`
+                    }
+                  >
+                    {isSpoken && (
+                      <span
+                        aria-hidden
+                        className="absolute bottom-1 left-0 top-1 w-[2px] animate-pulse rounded-full bg-acc"
+                      />
+                    )}
+                    {m.role === "assistant" ? (
+                      m.content ? (
+                        <RichText text={m.content} />
+                      ) : busy && i === messages.length - 1 ? (
+                        <span className="inline-flex gap-1">
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc" />
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc [animation-delay:150ms]" />
+                          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-acc [animation-delay:300ms]" />
+                        </span>
+                      ) : null
+                    ) : (
+                      m.content
+                    )}
+                  </div>
+                );
+              })}
 
               {error && (
                 <p className="mr-auto rounded-lg border border-red-400/30 bg-red-400/10 px-4 py-2.5 text-[13px] text-red-300">
