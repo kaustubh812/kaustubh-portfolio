@@ -22,44 +22,92 @@ gsap.registerPlugin(ScrollTrigger);
  *   1.15→2  chunks embed into vector-space clusters
  *   2→3  a query streaks in; its cluster stays lit while the rest dim
  *   3→4  retrieved chunks settle into a thin answer beam, the rest fade
+ *
+ * Two compositions: landscape (wide page row, wide cluster ring) and
+ * portrait (2×2 page grid, vertical cluster ring, beam below the text).
  */
 
 const COUNT = 12000;
-const PAGES = 5;
 const CLUSTERS = 7;
 const RELEVANT = 3;
-const RELEVANT_CENTER = new THREE.Vector3(1.6, 0.1, 0.8);
 
-const DATA = (() => {
+type Mode = "landscape" | "portrait";
+
+type SceneData = {
+  posDoc: Float32Array;
+  posChunk: Float32Array;
+  posCloud: Float32Array;
+  posLine: Float32Array;
+  seed: Float32Array;
+  flag: Float32Array;
+  relevantCenter: THREE.Vector3;
+  queryFrom: THREE.Vector3;
+};
+
+const LAYOUT = {
+  landscape: {
+    pages: 5,
+    pageW: 2.7,
+    pageH: 3.6,
+    pagePos: (p: number) => ({ x: (p - 2) * 3.4, y: 0.4 }),
+    relevantCenter: new THREE.Vector3(1.6, 0.1, 0.8),
+    ringCenter: (th: number, c: number) =>
+      new THREE.Vector3(
+        Math.cos(th) * 5.4,
+        Math.sin(c * 2.1) * 2.4,
+        -2.5 - Math.sin(th) * 1.8
+      ),
+    beam: { halfWidth: 5.5, y: -1.55 },
+    queryFrom: new THREE.Vector3(11, 4.5, 4),
+  },
+  portrait: {
+    pages: 4,
+    pageW: 1.9,
+    pageH: 2.5,
+    pagePos: (p: number) => ({
+      x: p % 2 === 0 ? -1.15 : 1.15,
+      y: p < 2 ? 2.0 : -1.4,
+    }),
+    relevantCenter: new THREE.Vector3(0.4, 0.7, 0.8),
+    ringCenter: (th: number, c: number) =>
+      new THREE.Vector3(
+        Math.cos(th) * 1.55,
+        Math.sin(c * 2.1) * 3.0,
+        -2.5 - Math.sin(th) * 1.8
+      ),
+    beam: { halfWidth: 2.3, y: -2.95 },
+    queryFrom: new THREE.Vector3(3.5, 6.5, 4),
+  },
+} as const;
+
+const dataCache: Partial<Record<Mode, SceneData>> = {};
+
+function getData(mode: Mode): SceneData {
+  const cached = dataCache[mode];
+  if (cached) return cached;
+
+  const L = LAYOUT[mode];
   const posDoc = new Float32Array(COUNT * 3);
   const posChunk = new Float32Array(COUNT * 3);
   const posCloud = new Float32Array(COUNT * 3);
   const posLine = new Float32Array(COUNT * 3);
   const seed = new Float32Array(COUNT);
-  const flag = new Float32Array(COUNT * 3); // x relevant, y color mix, z answer-beam member
+  const flag = new Float32Array(COUNT * 3); // x relevant, y color mix, z beam member
 
-  // page geometry: text lines grouped into paragraphs, like a real spec page
-  const PAGE_W = 2.7;
-  const PAGE_H = 3.6;
   const LINES = 20;
-  const PARA = 4; // lines per paragraph → 5 paragraphs per page
-  const pageX = (p: number) => (p - (PAGES - 1) / 2) * 3.4;
-  const PAGE_TOP = 0.4 + PAGE_H / 2;
+  const PARA = 4;
 
   // deterministic per-line lengths; paragraph-final lines run short
   const lineLen: number[][] = [];
-  for (let p = 0; p < PAGES; p++) {
+  const paraCluster: number[][] = [];
+  for (let p = 0; p < L.pages; p++) {
     lineLen.push(
       Array.from({ length: LINES }, (_, l) =>
-        (l % PARA === PARA - 1 ? 0.35 + Math.random() * 0.35 : 0.6 + Math.random() * 0.4) *
-        PAGE_W
+        (l % PARA === PARA - 1
+          ? 0.35 + Math.random() * 0.35
+          : 0.6 + Math.random() * 0.4) * L.pageW
       )
     );
-  }
-
-  // paragraph → cluster assignment
-  const paraCluster: number[][] = [];
-  for (let p = 0; p < PAGES; p++) {
     paraCluster.push(
       Array.from({ length: LINES / PARA }, () =>
         Math.floor(Math.random() * CLUSTERS)
@@ -67,50 +115,40 @@ const DATA = (() => {
     );
   }
 
-  // cluster centres: the relevant one front-and-centre-right, others on a loose ring
   const centers: THREE.Vector3[] = [];
   for (let c = 0; c < CLUSTERS; c++) {
-    if (c === RELEVANT) {
-      centers.push(RELEVANT_CENTER.clone());
-    } else {
-      const th = (c / CLUSTERS) * Math.PI * 2;
-      centers.push(
-        new THREE.Vector3(
-          Math.cos(th) * 5.4,
-          Math.sin(c * 2.1) * 2.4,
-          -2.5 - Math.sin(th) * 1.8
-        )
-      );
-    }
+    centers.push(
+      c === RELEVANT
+        ? L.relevantCenter.clone()
+        : L.ringCenter((c / CLUSTERS) * Math.PI * 2, c)
+    );
   }
 
-  const perPage = Math.floor(COUNT / PAGES);
-  const lineGap = PAGE_H / (LINES + LINES / PARA * 0.9);
+  const lineGap = L.pageH / (LINES + (LINES / PARA) * 0.9);
   const paraGap = lineGap * 0.9;
 
   for (let i = 0; i < COUNT; i++) {
-    const page = Math.min(Math.floor(i / perPage), PAGES - 1);
+    // interleaved so a reduced drawRange thins every page uniformly
+    const page = i % L.pages;
     const line = Math.floor(Math.random() * LINES);
     const para = Math.floor(line / PARA);
     const t = Math.random();
 
-    const cx = pageX(page);
+    const { x: cx, y: cy } = L.pagePos(page);
+    const pageTop = cy + L.pageH / 2;
     const len = lineLen[page][line];
-    const x = cx - PAGE_W / 2 + t * len + (Math.random() - 0.5) * 0.03;
+    const x = cx - L.pageW / 2 + t * len + (Math.random() - 0.5) * 0.03;
     const y =
-      PAGE_TOP -
-      line * lineGap -
-      para * paraGap +
-      (Math.random() - 0.5) * 0.035;
+      pageTop - line * lineGap - para * paraGap + (Math.random() - 0.5) * 0.035;
     const z = (Math.random() - 0.5) * 0.04;
     posDoc[i * 3] = x;
     posDoc[i * 3 + 1] = y;
     posDoc[i * 3 + 2] = z;
 
     // chunk = the paragraph tile tearing away from its page
-    const paraCy = PAGE_TOP - (para * PARA + PARA / 2) * lineGap - para * paraGap;
+    const paraCy = pageTop - (para * PARA + PARA / 2) * lineGap - para * paraGap;
     const dirX = (cx === 0 ? 0.4 : cx * 0.22) + (Math.random() - 0.5) * 0.8;
-    const dirY = (paraCy - 0.4) * 0.55 + (Math.random() - 0.5) * 0.8;
+    const dirY = (paraCy - cy) * 0.55 + (Math.random() - 0.5) * 0.8;
     const mag = 1.0 + Math.random() * 0.7;
     posChunk[i * 3] = x + dirX * mag * 0.35;
     posChunk[i * 3 + 1] = y + dirY * mag * 0.5;
@@ -120,7 +158,7 @@ const DATA = (() => {
     const cluster = paraCluster[page][para];
     const cc = centers[cluster];
     const g = () => (Math.random() + Math.random() + Math.random() - 1.5) * 0.7;
-    posCloud[i * 3] = cc.x + g();
+    posCloud[i * 3] = cc.x + g() * (mode === "portrait" ? 0.8 : 1);
     posCloud[i * 3 + 1] = cc.y + g() * 0.85;
     posCloud[i * 3 + 2] = cc.z + g() * 0.85;
 
@@ -132,10 +170,10 @@ const DATA = (() => {
     flag[i * 3 + 2] = inBeam;
     seed[i] = s;
 
-    // answer beam: a thin, wide, quiet line under the finale text
+    // answer beam: a thin, quiet line placed clear of the finale text
     if (inBeam) {
-      posLine[i * 3] = (Math.random() - 0.5) * 11;
-      posLine[i * 3 + 1] = -1.55 + g() * 0.09;
+      posLine[i * 3] = (Math.random() - 0.5) * 2 * L.beam.halfWidth;
+      posLine[i * 3 + 1] = L.beam.y + g() * 0.09;
       posLine[i * 3 + 2] = 1.8;
     } else {
       posLine[i * 3] = posCloud[i * 3];
@@ -144,8 +182,19 @@ const DATA = (() => {
     }
   }
 
-  return { posDoc, posChunk, posCloud, posLine, seed, flag };
-})();
+  const data: SceneData = {
+    posDoc,
+    posChunk,
+    posCloud,
+    posLine,
+    seed,
+    flag,
+    relevantCenter: L.relevantCenter.clone(),
+    queryFrom: L.queryFrom.clone(),
+  };
+  dataCache[mode] = data;
+  return data;
+}
 
 const vertex = /* glsl */ `
   uniform float uP;
@@ -161,7 +210,6 @@ const vertex = /* glsl */ `
   float ez(float t) { return t * t * (3.0 - 2.0 * t); }
 
   void main() {
-    // documents hold until 0.35, then tear apart paragraph by paragraph
     float e1 = ez(clamp((uP - 0.35 - aSeed * 0.25) / 0.55, 0.0, 1.0));
     float e2 = ez(clamp((uP - 1.15 - aSeed * 0.30) / 0.55, 0.0, 1.0));
     float e4 = ez(clamp((uP - 3.10 - aSeed * 0.25) / 0.55, 0.0, 1.0));
@@ -170,16 +218,13 @@ const vertex = /* glsl */ `
     p = mix(p, aCloud, e2);
     p = mix(p, aLine, e4 * aFlag.x);
 
-    // breathe while suspended in the embedding cloud
     float breathe = e2 * (1.0 - e4);
     p.x += sin(uTime * 0.55 + aSeed * 40.0) * 0.05 * breathe;
     p.y += cos(uTime * 0.45 + aSeed * 55.0) * 0.05 * breathe;
 
-    // shimmer along the finished answer beam
     float beam = e4 * aFlag.z;
     p.x += sin(uTime * 2.0 + aSeed * 90.0) * 0.03 * beam;
 
-    // retrieval: the relevant cluster holds its light, everything else dims away
     float hl = smoothstep(2.25, 2.80, uP) * aFlag.x;
     float dim = (1.0 - aFlag.x) * smoothstep(2.25, 2.95, uP);
     float gone = (1.0 - aFlag.z) * ez(clamp((uP - 3.05) / 0.65, 0.0, 1.0));
@@ -214,20 +259,25 @@ const fragment = /* glsl */ `
 
 const UNIFORMS = { uP: { value: 0 }, uTime: { value: 0 } };
 
-const QUERY_FROM = new THREE.Vector3(11, 4.5, 4);
-
-function Pipeline({ progress }: { progress: MutableRefObject<number> }) {
+function Pipeline({
+  progress,
+  mode,
+}: {
+  progress: MutableRefObject<number>;
+  mode: Mode;
+}) {
   const mat = useRef<THREE.ShaderMaterial>(null);
   const geo = useRef<THREE.BufferGeometry>(null);
   const group = useRef<THREE.Group>(null);
   const query = useRef<THREE.Mesh>(null);
+  const data = getData(mode);
 
   useEffect(() => {
-    // smaller particle budget on narrow screens
-    if (geo.current && window.innerWidth < 768) {
+    // smaller particle budget on phones
+    if (geo.current && mode === "portrait") {
       geo.current.setDrawRange(0, Math.floor(COUNT * 0.55));
     }
-  }, []);
+  }, [mode]);
 
   useFrame((state) => {
     const p = progress.current;
@@ -237,9 +287,11 @@ function Pipeline({ progress }: { progress: MutableRefObject<number> }) {
     }
     const g = group.current;
     if (g) {
-      // fit the page row on narrow viewports
+      // portrait layout is composed for the frame already; landscape
+      // shrinks a little on narrower windows
       const aspect = state.size.width / state.size.height;
-      const fit = THREE.MathUtils.clamp(aspect / 1.7, 0.5, 1);
+      const fit =
+        mode === "portrait" ? 1 : THREE.MathUtils.clamp(aspect / 1.7, 0.6, 1);
       g.scale.setScalar(fit);
 
       const cloudIn = THREE.MathUtils.smoothstep(p, 1.15, 2);
@@ -253,7 +305,7 @@ function Pipeline({ progress }: { progress: MutableRefObject<number> }) {
     if (q) {
       const t = THREE.MathUtils.clamp((p - 2.0) / 0.55, 0, 1);
       const e = t * t * (3 - 2 * t);
-      q.position.lerpVectors(QUERY_FROM, RELEVANT_CENTER, e);
+      q.position.lerpVectors(data.queryFrom, data.relevantCenter, e);
       const alive = p > 2.02 && p < 3.1 ? 1 : 0;
       const pulse = 1 + Math.sin(state.clock.elapsedTime * 6) * 0.15;
       q.scale.setScalar(
@@ -264,23 +316,23 @@ function Pipeline({ progress }: { progress: MutableRefObject<number> }) {
 
   return (
     <group ref={group}>
-      <points>
+      <points key={mode}>
         <bufferGeometry ref={geo}>
-          <bufferAttribute attach="attributes-position" args={[DATA.posDoc, 3]} />
-          <bufferAttribute attach="attributes-aChunk" args={[DATA.posChunk, 3]} />
-          <bufferAttribute attach="attributes-aCloud" args={[DATA.posCloud, 3]} />
-          <bufferAttribute attach="attributes-aLine" args={[DATA.posLine, 3]} />
-          <bufferAttribute attach="attributes-aSeed" args={[DATA.seed, 1]} />
-          <bufferAttribute attach="attributes-aFlag" args={[DATA.flag, 3]} />
+          <bufferAttribute attach="attributes-position" args={[data.posDoc, 3]} />
+          <bufferAttribute attach="attributes-aChunk" args={[data.posChunk, 3]} />
+          <bufferAttribute attach="attributes-aCloud" args={[data.posCloud, 3]} />
+          <bufferAttribute attach="attributes-aLine" args={[data.posLine, 3]} />
+          <bufferAttribute attach="attributes-aSeed" args={[data.seed, 1]} />
+          <bufferAttribute attach="attributes-aFlag" args={[data.flag, 3]} />
         </bufferGeometry>
         <shaderMaterial
-          ref={mat}
           vertexShader={vertex}
           fragmentShader={fragment}
           uniforms={UNIFORMS}
           transparent
           depthWrite={false}
           blending={THREE.AdditiveBlending}
+          ref={mat}
         />
       </points>
       <mesh ref={query} scale={0}>
@@ -301,19 +353,19 @@ const CAPTIONS = [
   {
     k: "01 · The documents",
     t: "Thousands of internal documents — specs, procedures, standards — on a network no cloud AI is allowed to touch.",
-    pos: "left-[5%] bottom-[10%] max-w-[400px]",
+    pos: "md:left-[5%] md:right-auto md:top-auto md:bottom-[10%]",
     window: [0.03, 0.9] as const,
   },
   {
     k: "02 · Chunk & embed",
     t: "Each document is parsed, split into chunks, and every chunk becomes a vector — meaning, mapped into space.",
-    pos: "right-[5%] top-[14%] max-w-[400px]",
+    pos: "md:left-auto md:right-[5%] md:top-[16%] md:bottom-auto",
     window: [1.1, 2.0] as const,
   },
   {
     k: "03 · Retrieve & rerank",
     t: "A question flies in. Hybrid search pulls its nearest neighbors; a reranker keeps only what truly answers.",
-    pos: "left-[5%] top-[14%] max-w-[400px]",
+    pos: "md:left-[5%] md:right-auto md:top-[16%] md:bottom-auto",
     window: [2.15, 3.0] as const,
   },
 ] as const;
@@ -326,11 +378,16 @@ function fadeFor(p: number, [a, b]: readonly [number, number]) {
   return Math.min(inn, out);
 }
 
-function subscribeReducedMotion(cb: () => void) {
-  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
+function subscribeMedia(query: string) {
+  return (cb: () => void) => {
+    const mq = window.matchMedia(query);
+    mq.addEventListener("change", cb);
+    return () => mq.removeEventListener("change", cb);
+  };
 }
+
+const subscribeReduced = subscribeMedia("(prefers-reduced-motion: reduce)");
+const subscribeNarrow = subscribeMedia("(max-width: 767px)");
 
 export default function ScrollStory() {
   const wrap = useRef<HTMLElement>(null);
@@ -339,10 +396,16 @@ export default function ScrollStory() {
   const progress = useRef(0);
   const [visible, setVisible] = useState(true);
   const reduced = useSyncExternalStore(
-    subscribeReducedMotion,
+    subscribeReduced,
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     () => false
   );
+  const narrow = useSyncExternalStore(
+    subscribeNarrow,
+    () => window.matchMedia("(max-width: 767px)").matches,
+    () => false
+  );
+  const mode: Mode = narrow ? "portrait" : "landscape";
 
   useEffect(() => {
     if (reduced) return;
@@ -419,17 +482,19 @@ export default function ScrollStory() {
           gl={{ antialias: false, powerPreference: "high-performance" }}
           frameloop={visible ? "always" : "never"}
         >
-          <Pipeline progress={progress} />
+          <Pipeline progress={progress} mode={mode} />
         </Canvas>
 
         {/* header strip */}
-        <div className="pointer-events-none absolute left-0 right-0 top-[88px] z-10">
+        <div className="pointer-events-none absolute left-0 right-0 top-[84px] z-10">
           <div className="container-x">
-            <p className="eyebrow">How my systems work — keep scrolling</p>
+            <p className="eyebrow">
+              How my systems work — keep scrolling
+            </p>
           </div>
         </div>
 
-        {/* captions on quiet glass scrims */}
+        {/* captions: bottom sheets on mobile, corner cards on desktop */}
         <div className="pointer-events-none absolute inset-0 z-10">
           {CAPTIONS.map((c, i) => (
             <div
@@ -437,12 +502,12 @@ export default function ScrollStory() {
               ref={(el) => {
                 capRefs.current[i] = el;
               }}
-              className={`absolute ${c.pos} rounded-2xl border border-line bg-bg/70 p-6 opacity-0 backdrop-blur-sm`}
+              className={`absolute bottom-[7%] left-4 right-4 top-auto rounded-2xl border border-line bg-bg/80 p-5 opacity-0 backdrop-blur-sm md:max-w-[400px] md:bg-bg/70 md:p-6 ${c.pos}`}
             >
               <p className="font-mono text-[11px] tracking-[0.25em] text-acc2">
                 {c.k.toUpperCase()}
               </p>
-              <p className="mt-3 text-[15px] leading-[1.75] text-ink2">
+              <p className="mt-3 text-[14px] leading-[1.7] text-ink2 md:text-[15px] md:leading-[1.75]">
                 {c.t}
               </p>
             </div>
@@ -451,7 +516,7 @@ export default function ScrollStory() {
           {/* finale */}
           <div
             ref={finaleRef}
-            className="absolute inset-x-0 top-[36%] mx-auto max-w-[900px] px-6 text-center opacity-0"
+            className="absolute inset-x-0 top-[30%] mx-auto max-w-[900px] px-6 text-center opacity-0 md:top-[36%]"
           >
             <p className="font-mono text-[11px] tracking-[0.25em] text-acc2">
               04 · ANSWER, GROUNDED
