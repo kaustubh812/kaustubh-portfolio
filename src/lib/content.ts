@@ -71,27 +71,77 @@ export const profile = {
   skills: [
     {
       group: "AI / LLM",
-      items:
-        "RAG · Agentic AI · Multi-agent systems · LangGraph · LangChain · Prompt engineering · Tool calling · Embeddings · Hybrid search (BM25 + dense) · Reranking · Cross-encoders · Document parsing / OCR · Evals",
+      items: [
+        { name: "RAG", in: ["nebula-ai", "atlas-ai"] },
+        { name: "Agentic AI", in: ["nebula-ai"] },
+        { name: "Multi-agent systems", in: ["nebula-ai", "atlas-ai"] },
+        { name: "LangGraph", in: ["nebula-ai"] },
+        { name: "LangChain", in: ["nebula-ai"] },
+        {
+          name: "Prompt engineering",
+          in: ["nebula-ai", "testmatrix-ai", "atlas-ai"],
+        },
+        { name: "Tool calling", in: ["nebula-ai"] },
+        { name: "Embeddings", in: ["nebula-ai", "atlas-ai"] },
+        { name: "Hybrid search (BM25 + dense)", in: ["nebula-ai"] },
+        { name: "Reranking", in: ["nebula-ai"] },
+        { name: "Cross-encoders", in: ["nebula-ai"] },
+        { name: "Document parsing / OCR", in: ["atlas-ai"] },
+        { name: "Evals", in: ["testmatrix-ai"] },
+      ],
     },
     {
       group: "Voice AI",
-      items:
-        "Speech-to-text · Text-to-speech · Voice activity detection · Real-time streaming · WebSockets · Sub-second latency pipelines",
+      items: [
+        { name: "Speech-to-text", in: ["nebula-ai", "luna-ai"] },
+        { name: "Text-to-speech", in: ["nebula-ai", "luna-ai"] },
+        { name: "Voice activity detection", in: ["nebula-ai"] },
+        { name: "Real-time streaming", in: ["nebula-ai"] },
+        { name: "WebSockets", in: ["nebula-ai"] },
+        { name: "Sub-second latency pipelines", in: ["nebula-ai"] },
+      ],
     },
     {
       group: "Backend",
-      items:
-        "Python · FastAPI · SQLAlchemy · Alembic · Pydantic · Node.js · PostgreSQL · Qdrant · REST APIs",
+      items: [
+        {
+          name: "Python",
+          in: ["nebula-ai", "testmatrix-ai", "atlas-ai", "luna-ai"],
+        },
+        { name: "FastAPI", in: ["nebula-ai", "luna-ai"] },
+        { name: "SQLAlchemy", in: ["nebula-ai", "luna-ai"] },
+        { name: "Alembic", in: ["nebula-ai"] },
+        { name: "Pydantic", in: ["nebula-ai", "luna-ai"] },
+        { name: "Node.js" },
+        { name: "PostgreSQL", in: ["nebula-ai", "luna-ai"] },
+        { name: "Qdrant", in: ["nebula-ai"] },
+        { name: "REST APIs", in: ["luna-ai", "spenzy-ai"] },
+      ],
     },
     {
       group: "Frontend / Mobile",
-      items: "TypeScript · React · React Native · Expo · Flutter · Next.js",
+      items: [
+        { name: "TypeScript", in: ["nebula-ai"], note: "and this very website" },
+        { name: "React", in: ["nebula-ai"] },
+        { name: "React Native", in: ["luna-ai"] },
+        { name: "Expo", in: ["luna-ai"] },
+        { name: "Flutter", in: ["spenzy-ai"] },
+        { name: "Next.js", note: "this very website" },
+        { name: "Three.js / WebGL", note: "this very website" },
+      ],
     },
     {
       group: "Deployment / LLMOps",
-      items:
-        "Docker · Nginx · Ollama · Linux · Git · On-premise inference · Vercel · Render",
+      items: [
+        { name: "Docker", in: ["nebula-ai"] },
+        { name: "Nginx", in: ["nebula-ai"] },
+        { name: "Ollama", in: ["nebula-ai"] },
+        { name: "Linux", in: ["nebula-ai"] },
+        { name: "On-premise inference", in: ["nebula-ai"] },
+        { name: "Vercel", note: "this very website" },
+        { name: "Render", in: ["luna-ai"] },
+        { name: "Git" },
+      ],
     },
   ],
 } as const;
@@ -478,7 +528,9 @@ export function buildAgentContext(): string {
   lines.push(
     ``,
     `## Skills`,
-    ...p.skills.map((s) => `- ${s.group}: ${s.items}`),
+    ...p.skills.map(
+      (s) => `- ${s.group}: ${s.items.map((i) => i.name).join(", ")}`
+    ),
     ``,
     `## Education`,
     ...p.education.map((e) => `- ${e.degree}, ${e.school} (${e.period}) — ${e.note}`),

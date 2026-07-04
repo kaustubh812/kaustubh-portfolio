@@ -1,8 +1,123 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Reveal from "@/components/Reveal";
 import { projects } from "@/lib/content";
 
+gsap.registerPlugin(ScrollTrigger);
+
+/**
+ * Projects along a scroll-drawn serpentine path: one glowing line weaves
+ * down the section, drawing itself with scroll; each card lights up as
+ * the tip reaches its bend. On mobile the path is dropped and cards stack.
+ */
+
+type Geo = {
+  w: number;
+  h: number;
+  d: string;
+  pts: { x: number; y: number }[];
+};
+
 export default function Work() {
+  const listRef = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const nodeRefs = useRef<(SVGCircleElement | null)[]>([]);
+  const pathRef = useRef<SVGPathElement>(null);
+  const tipRef = useRef<SVGGElement>(null);
+  const [geo, setGeo] = useState<Geo | null>(null);
+
+  // measure card centres and build the serpentine path through them
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const build = () => {
+      if (window.innerWidth < 768) {
+        setGeo(null);
+        return;
+      }
+      const w = list.clientWidth;
+      const h = list.scrollHeight;
+      const pts = cardRefs.current.map((el, i) => ({
+        // card on the left → line bends just right of it, and vice versa
+        x: w * (i % 2 === 0 ? 0.575 : 0.425),
+        y: el ? el.offsetTop + el.offsetHeight / 2 : 0,
+      }));
+      const all = [{ x: w * 0.5, y: -8 }, ...pts, { x: w * 0.5, y: h + 8 }];
+      let d = `M ${all[0].x} ${all[0].y}`;
+      for (let i = 1; i < all.length; i++) {
+        const a = all[i - 1];
+        const b = all[i];
+        const my = (a.y + b.y) / 2;
+        d += ` C ${a.x} ${my} ${b.x} ${my} ${b.x} ${b.y}`;
+      }
+      setGeo({ w, h, d, pts });
+    };
+    build();
+    const ro = new ResizeObserver(build);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, []);
+
+  // scroll-scrubbed line draw + card ignition
+  useEffect(() => {
+    const path = pathRef.current;
+    const list = listRef.current;
+    if (!geo || !path || !list) return;
+    const tip = tipRef.current;
+    const len = path.getTotalLength();
+    path.style.strokeDasharray = `${len}`;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      path.style.strokeDashoffset = "0";
+      cardRefs.current.forEach((el) => el?.classList.add("wk-in"));
+      tip?.setAttribute("opacity", "0");
+      return;
+    }
+
+    path.style.strokeDashoffset = `${len}`;
+    // cumulative path length at each card ≈ equal bezier segments
+    const segs = geo.pts.length + 1;
+    const at = geo.pts.map((_, i) => (len * (i + 1)) / segs);
+
+    const st = ScrollTrigger.create({
+      trigger: list,
+      start: "top 74%",
+      end: "bottom 62%",
+      scrub: 0.6,
+      onUpdate(self) {
+        const drawn = len * self.progress;
+        path.style.strokeDashoffset = `${len - drawn}`;
+        if (tip) {
+          const pt = path.getPointAtLength(drawn);
+          tip.setAttribute("transform", `translate(${pt.x} ${pt.y})`);
+          tip.setAttribute(
+            "opacity",
+            self.progress > 0.004 && self.progress < 0.996 ? "1" : "0"
+          );
+        }
+        // the card whose node the spark is currently visiting lights up
+        const win = (len / segs) * 0.38;
+        let lit = -1;
+        at.forEach((l, i) => {
+          if (Math.abs(drawn - l) < win) lit = i;
+        });
+        cardRefs.current.forEach((el, i) => {
+          if (!el) return;
+          if (drawn >= at[i] - 40) el.classList.add("wk-in");
+          el.classList.toggle("wk-lit", i === lit);
+        });
+        nodeRefs.current.forEach((c, i) => {
+          c?.classList.toggle("wk-node-lit", i === lit);
+        });
+      },
+    });
+    return () => st.kill();
+  }, [geo]);
+
   return (
     <section id="work" className="container-x py-28 sm:py-36">
       <Reveal as="p" className="eyebrow">
@@ -18,50 +133,111 @@ export default function Work() {
         <span className="serif-accent">why</span> it worked.
       </Reveal>
 
-      <div className="mt-16">
-        {projects.map((p, i) => (
-          <Reveal key={p.slug} delay={Math.min(i * 60, 180)}>
-            <Link
-              href={`/work/${p.slug}`}
-              className="group grid grid-cols-1 gap-4 border-t border-line py-10 transition-colors last:border-b hover:bg-bg2/60 md:grid-cols-[110px_1.35fr_1fr_44px] md:items-center md:gap-8 md:py-12"
-            >
-              <div className="font-mono text-xs tracking-[0.2em] text-mut">
-                {p.index}
-                <span className="mt-2 block text-[10px] text-acc">
-                  {p.org.toUpperCase()}
-                </span>
-              </div>
+      <div ref={listRef} className="relative mt-20">
+        {geo && (
+          <svg
+            className="pointer-events-none absolute inset-0 z-0 hidden md:block"
+            width={geo.w}
+            height={geo.h}
+            viewBox={`0 0 ${geo.w} ${geo.h}`}
+            fill="none"
+            aria-hidden
+          >
+            <defs>
+              <linearGradient
+                id="wk-grad"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2={geo.h}
+                gradientUnits="userSpaceOnUse"
+              >
+                <stop offset="0" stopColor="#8b7cff" />
+                <stop offset="1" stopColor="#67e8f9" />
+              </linearGradient>
+            </defs>
+            {/* ghost of the full route */}
+            <path
+              d={geo.d}
+              stroke="url(#wk-grad)"
+              strokeOpacity="0.1"
+              strokeWidth="1.5"
+            />
+            {/* the drawn line */}
+            <path
+              ref={pathRef}
+              d={geo.d}
+              stroke="url(#wk-grad)"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            {/* a node at each project */}
+            {geo.pts.map((pt, i) => (
+              <circle
+                key={i}
+                ref={(el) => {
+                  nodeRefs.current[i] = el;
+                }}
+                cx={pt.x}
+                cy={pt.y}
+                r="4"
+                className="wk-node"
+                fill="#08080d"
+                stroke="#8b7cff"
+                strokeWidth="1.5"
+              />
+            ))}
+            {/* the travelling spark */}
+            <g ref={tipRef} opacity="0">
+              <circle r="10" fill="#b9adff" opacity="0.22" />
+              <circle r="3.5" fill="#cfc7ff" />
+            </g>
+          </svg>
+        )}
 
-              <div>
-                <h3 className="text-[clamp(26px,3.2vw,44px)] font-semibold leading-tight tracking-[-0.02em] transition-transform duration-500 ease-out group-hover:translate-x-2">
+        <div className="relative z-10 flex flex-col gap-10 md:gap-20">
+          {projects.map((p, i) => (
+            <div
+              key={p.slug}
+              className={`flex ${i % 2 === 0 ? "md:justify-start" : "md:justify-end"}`}
+            >
+              <Link
+                href={`/work/${p.slug}`}
+                ref={(el) => {
+                  cardRefs.current[i] = el;
+                }}
+                className="wk-card group block w-full rounded-2xl border border-line bg-bg2/50 p-7 backdrop-blur-[2px] transition-colors duration-300 hover:border-acc/60 hover:bg-bg2 md:w-[46%] sm:p-8"
+              >
+                <div className="flex items-baseline justify-between font-mono text-xs tracking-[0.2em] text-mut">
+                  <span>
+                    {p.index} · <span className="text-acc">{p.org.toUpperCase()}</span>
+                  </span>
+                  <span
+                    aria-hidden
+                    className="text-lg tracking-normal text-mut transition-all duration-500 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-acc2"
+                  >
+                    ↗
+                  </span>
+                </div>
+                <h3 className="mt-5 text-[clamp(24px,2.6vw,36px)] font-semibold leading-tight tracking-[-0.02em]">
                   {p.title}
                 </h3>
-                <p className="mt-2 max-w-[46ch] text-[15px] leading-relaxed text-ink2">
+                <p className="mt-2.5 text-[14.5px] leading-relaxed text-ink2">
                   {p.tagline}
                 </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <p className="font-mono text-xs leading-relaxed text-mut">
+                <p className="mt-5 font-mono text-[11px] leading-relaxed text-mut">
                   {p.stack.slice(0, 4).join(" · ")}
                 </p>
-                <p className="text-sm text-ink2">
+                <p className="mt-3 border-t border-line pt-4 text-sm text-ink2">
                   <span className="font-semibold text-acc2">
                     {p.metrics[0].value}
                   </span>{" "}
                   {p.metrics[0].label}
                 </p>
-              </div>
-
-              <div
-                aria-hidden
-                className="hidden justify-self-end text-2xl text-mut transition-all duration-500 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-acc2 md:block"
-              >
-                ↗
-              </div>
-            </Link>
-          </Reveal>
-        ))}
+              </Link>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
