@@ -13,7 +13,7 @@ export const profile = {
   phone: "+91 94210 27834",
   linkedin: "https://www.linkedin.com/in/kaustubh-watane-6135b41a3",
   github: "https://github.com/kaustubh812",
-  resumeFile: "/Kaustubh_Watane_Resume.pdf",
+  resumeFile: "/Kaustubh_watane_9421027834.pdf",
   headline: "I build AI that ships — and stays shipped.",
   subline:
     "RAG, agentic and voice systems in production at GE HealthCare. Three shipped in 10 months, solo, on a regulated medical-device network.",
