@@ -273,10 +273,11 @@ function Pipeline({
   const data = getData(mode);
 
   useEffect(() => {
-    // smaller particle budget on phones
-    if (geo.current && mode === "portrait") {
-      geo.current.setDrawRange(0, Math.floor(COUNT * 0.55));
-    }
+    // smaller particle budget on phones, mid budget on portrait tablets
+    if (!geo.current) return;
+    const budget =
+      mode === "portrait" ? (window.innerWidth < 768 ? 0.55 : 0.8) : 1;
+    geo.current.setDrawRange(0, Math.floor(COUNT * budget));
   }, [mode]);
 
   useFrame((state) => {
@@ -353,19 +354,19 @@ const CAPTIONS = [
   {
     k: "01 · The documents",
     t: "Thousands of internal documents — specs, procedures, standards — on a network no cloud AI is allowed to touch.",
-    pos: "md:left-[5%] md:right-auto md:top-auto md:bottom-[10%]",
+    pos: "md:landscape:left-[5%] md:landscape:right-auto md:landscape:top-auto md:landscape:bottom-[10%]",
     window: [0.03, 0.9] as const,
   },
   {
     k: "02 · Chunk & embed",
     t: "Each document is parsed, split into chunks, and every chunk becomes a vector — meaning, mapped into space.",
-    pos: "md:left-auto md:right-[5%] md:top-[16%] md:bottom-auto",
+    pos: "md:landscape:left-auto md:landscape:right-[5%] md:landscape:top-[16%] md:landscape:bottom-auto",
     window: [1.1, 2.0] as const,
   },
   {
     k: "03 · Retrieve & rerank",
     t: "A question flies in. Hybrid search pulls its nearest neighbors; a reranker keeps only what truly answers.",
-    pos: "md:left-[5%] md:right-auto md:top-[16%] md:bottom-auto",
+    pos: "md:landscape:left-[5%] md:landscape:right-auto md:landscape:top-[16%] md:landscape:bottom-auto",
     window: [2.15, 3.0] as const,
   },
 ] as const;
@@ -387,7 +388,9 @@ function subscribeMedia(query: string) {
 }
 
 const subscribeReduced = subscribeMedia("(prefers-reduced-motion: reduce)");
-const subscribeNarrow = subscribeMedia("(max-width: 767px)");
+// the scene layout follows the frame's shape, not a width breakpoint —
+// a tablet held upright needs the portrait composition too
+const subscribePortrait = subscribeMedia("(orientation: portrait)");
 
 export default function ScrollStory() {
   const wrap = useRef<HTMLElement>(null);
@@ -400,12 +403,12 @@ export default function ScrollStory() {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     () => false
   );
-  const narrow = useSyncExternalStore(
-    subscribeNarrow,
-    () => window.matchMedia("(max-width: 767px)").matches,
+  const isPortrait = useSyncExternalStore(
+    subscribePortrait,
+    () => window.matchMedia("(orientation: portrait)").matches,
     () => false
   );
-  const mode: Mode = narrow ? "portrait" : "landscape";
+  const mode: Mode = isPortrait ? "portrait" : "landscape";
 
   useEffect(() => {
     if (reduced) return;
@@ -502,7 +505,7 @@ export default function ScrollStory() {
               ref={(el) => {
                 capRefs.current[i] = el;
               }}
-              className={`absolute bottom-[7%] left-4 right-4 top-auto rounded-2xl border border-line bg-bg/80 p-5 opacity-0 backdrop-blur-sm md:max-w-[400px] md:bg-bg/70 md:p-6 ${c.pos}`}
+              className={`absolute bottom-[7%] left-4 right-4 top-auto rounded-2xl border border-line bg-bg/80 p-5 opacity-0 backdrop-blur-sm md:landscape:max-w-[400px] md:landscape:bg-bg/70 md:landscape:p-6 ${c.pos}`}
             >
               <p className="font-mono text-[11px] tracking-[0.25em] text-acc2">
                 {c.k.toUpperCase()}
@@ -516,7 +519,7 @@ export default function ScrollStory() {
           {/* finale */}
           <div
             ref={finaleRef}
-            className="absolute inset-x-0 top-[30%] mx-auto max-w-[900px] px-6 text-center opacity-0 md:top-[36%]"
+            className="absolute inset-x-0 top-[30%] mx-auto max-w-[900px] px-6 text-center opacity-0 md:landscape:top-[36%]"
           >
             <p className="font-mono text-[11px] tracking-[0.25em] text-acc2">
               04 · ANSWER, GROUNDED
