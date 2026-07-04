@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { profile } from "@/lib/content";
+import { siteUrl } from "@/lib/site";
 import SmoothScroll from "@/components/SmoothScroll";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -29,9 +30,7 @@ const description =
   "AI/LLM Engineer at GE HealthCare. Production RAG, agentic and voice AI on regulated networks — three systems shipped solo in 10 months. This portfolio answers questions about itself.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"
-  ),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: title,
     template: `%s — ${profile.name}`,
@@ -62,7 +61,7 @@ const personJsonLd = {
   jobTitle: profile.role,
   worksFor: { "@type": "Organization", name: profile.company },
   email: `mailto:${profile.email}`,
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+  url: siteUrl(),
   sameAs: [profile.linkedin, profile.github],
   address: {
     "@type": "PostalAddress",

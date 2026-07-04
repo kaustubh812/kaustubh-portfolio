@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
 import { projects } from "@/lib/content";
+import { siteUrl } from "@/lib/site";
 
-const base = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const base = siteUrl();
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
