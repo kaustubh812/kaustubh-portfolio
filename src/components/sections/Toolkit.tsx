@@ -68,7 +68,11 @@ export default function Toolkit() {
                   }`}
                   aria-live="polite"
                 >
-                  <span className="text-mut">PROVEN IN → </span>
+                  <span className="text-mut">
+                    {active && "in" in active && active.in?.length
+                      ? "PROVEN IN → "
+                      : "BACKED BY → "}
+                  </span>
                   {active &&
                     "in" in active &&
                     active.in?.map((slug, k) => (

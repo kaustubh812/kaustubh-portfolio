@@ -92,6 +92,11 @@ export const profile = {
         { name: "Cross-encoders", in: ["nebula-ai"] },
         { name: "Document parsing / OCR", in: ["atlas-ai"] },
         { name: "Evals", in: ["testmatrix-ai"] },
+        {
+          name: "AI system architecture & orchestration",
+          in: ["nebula-ai", "atlas-ai"],
+          note: "certified — Building AI Products: Architecture and Orchestration",
+        },
       ],
     },
     {
@@ -137,11 +142,27 @@ export const profile = {
     {
       group: "Deployment / LLMOps",
       items: [
-        { name: "Docker", in: ["nebula-ai"] },
+        {
+          name: "Docker",
+          in: ["nebula-ai"],
+          note: "certified — Docker Foundations",
+        },
         { name: "Nginx", in: ["nebula-ai"] },
         { name: "Ollama", in: ["nebula-ai"] },
         { name: "Linux", in: ["nebula-ai"] },
         { name: "On-premise inference", in: ["nebula-ai"] },
+        {
+          name: "Azure AI services",
+          note: "certified — Microsoft Azure AI Essentials",
+        },
+        {
+          name: "Cloud AI/ML deployment",
+          note: "certified — Microsoft Azure AI Essentials",
+        },
+        {
+          name: "Responsible AI",
+          note: "certified — Microsoft Azure AI Essentials",
+        },
         { name: "Vercel", note: "this very website" },
         { name: "Render", in: ["luna-ai"] },
         { name: "Git" },
