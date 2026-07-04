@@ -36,7 +36,9 @@ export default function Reveal({
     if (!el) return;
     const io = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
+        // also reveal when already scrolled past (e.g. hydration finished
+        // after the user scrolled) — otherwise it would stay hidden forever
+        if (entry.isIntersecting || entry.boundingClientRect.top < 0) {
           el.classList.add("is-visible");
           io.disconnect();
         }

@@ -62,6 +62,27 @@ export default function Work() {
     return () => ro.disconnect();
   }, []);
 
+  // baseline reveal for every card — works on mobile (no path) and
+  // guards against hydration finishing after the user already scrolled
+  useEffect(() => {
+    const els = cardRefs.current.filter(
+      (el): el is HTMLAnchorElement => !!el
+    );
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting || e.boundingClientRect.top < 0) {
+            e.target.classList.add("wk-in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { threshold: 0.08, rootMargin: "0px 0px -6% 0px" }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, []);
+
   // scroll-scrubbed line draw + card ignition
   useEffect(() => {
     const path = pathRef.current;
