@@ -392,34 +392,46 @@ export default function AgentSection() {
                   </span>
                 )}
                 {speaking ? (
-                  <span className="flex items-center gap-3">
+                  <button
+                    onClick={stopSpeaking}
+                    className="flex items-center gap-2.5 rounded-full border border-acc/50 bg-acc/10 py-1.5 pl-3 pr-3.5 text-acc2 transition-colors hover:border-acc hover:bg-acc/20 active:scale-95"
+                    aria-label="Stop speaking"
+                  >
                     <Equalizer />
-                    <button
-                      onClick={stopSpeaking}
-                      className="text-ink transition-colors hover:text-acc2"
-                    >
-                      ■ STOP
-                    </button>
-                  </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-[8px] w-[8px] rounded-[2px] bg-current" />
+                      STOP
+                    </span>
+                  </button>
                 ) : (
                   <button
                     onClick={() => setVoiceReplies((v) => !v)}
                     aria-pressed={voiceReplies}
-                    className={`transition-colors ${
-                      voiceReplies ? "text-acc2" : "hover:text-ink"
+                    className={`flex items-center gap-2 rounded-full border py-1.5 px-3.5 transition-colors active:scale-95 ${
+                      voiceReplies
+                        ? "border-acc/50 bg-acc/10 text-acc2"
+                        : "border-line text-mut hover:border-line-strong hover:text-ink"
                     }`}
                     title="Speak all replies aloud"
                   >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        voiceReplies ? "bg-acc2" : "bg-mut"
+                      }`}
+                    />
                     {voiceReplies ? "VOICE ON" : "VOICE OFF"}
                   </button>
                 )}
               </div>
             </div>
 
-            {/* transcript */}
+            {/* transcript — data-lenis-prevent keeps Lenis from hijacking
+                its wheel/touch events; overscroll-contain stops the page
+                from scrolling when the transcript reaches its ends */}
             <div
               ref={scrollRef}
-              className="flex h-[380px] flex-col gap-5 overflow-y-auto scroll-smooth px-5 py-6 sm:px-7"
+              data-lenis-prevent
+              className="flex h-[380px] flex-col gap-5 overflow-y-auto overscroll-contain scroll-smooth px-5 py-6 sm:px-7"
               aria-live="polite"
             >
               {messages.length === 0 && (
