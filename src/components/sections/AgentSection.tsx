@@ -9,37 +9,205 @@ type Msg = { role: "user" | "assistant"; content: string };
 const SUGGESTIONS = [
   "Why should I hire Kaustubh?",
   "What is Nebula AI?",
-  "How did he get voice latency under 1 second?",
-  "What's his strongest RAG experience?",
+  "What's the hardest engineering problem he's solved?",
+  "How does he stop LLMs from hallucinating?",
 ];
+
+/* ---------- Web Speech API (prefixed in Chrome) ---------- */
+type Recognition = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((e: RecognitionEvent) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+type RecognitionEvent = {
+  results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>;
+};
+
+function createRecognition(): Recognition | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: new () => Recognition;
+    webkitSpeechRecognition?: new () => Recognition;
+  };
+  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+  return Ctor ? new Ctor() : null;
+}
 
 export default function AgentSection() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceReplies, setVoiceReplies] = useState(false);
+  const [latency, setLatency] = useState<{ token: number; audio?: number } | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const recRef = useRef<Recognition | null>(null);
+  const spokenChars = useRef(0);
+  const pendingUtterances = useRef(0);
+  const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  // voice list loads asynchronously in most browsers
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return;
+    const load = () => {
+      voicesRef.current = window.speechSynthesis.getVoices();
+    };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () =>
+      window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
 
-  async function send(text: string) {
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      recRef.current?.abort();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    },
+    []
+  );
+
+  /* ---------- speaking ---------- */
+
+  function speak(text: string, onStart?: () => void) {
+    if (!("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(text);
+    const en = voicesRef.current.filter((v) => v.lang.startsWith("en"));
+    u.voice =
+      en.find((v) => /natural|online|google/i.test(v.name)) ?? en[0] ?? null;
+    u.rate = 1.05;
+    pendingUtterances.current += 1;
+    setSpeaking(true);
+    u.onstart = () => onStart?.();
+    const done = () => {
+      pendingUtterances.current -= 1;
+      if (pendingUtterances.current <= 0) {
+        pendingUtterances.current = 0;
+        setSpeaking(false);
+      }
+    };
+    u.onend = done;
+    u.onerror = done;
+    window.speechSynthesis.speak(u);
+  }
+
+  /** Speak completed sentences of the streamed answer as they arrive. */
+  function speakProgress(full: string, flush: boolean, onFirstAudio: () => void) {
+    const rest = full.slice(spokenChars.current);
+    if (!rest.trim()) return;
+    if (flush) {
+      speak(rest.trim(), onFirstAudio);
+      spokenChars.current = full.length;
+      return;
+    }
+    let cut = -1;
+    const re = /[.!?](?:\s|$)/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(rest))) cut = m.index + 1;
+    if (cut > 0) {
+      speak(rest.slice(0, cut).trim(), onFirstAudio);
+      spokenChars.current += cut;
+    }
+  }
+
+  function stopSpeaking() {
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    pendingUtterances.current = 0;
+    setSpeaking(false);
+  }
+
+  /* ---------- listening ---------- */
+
+  function toggleMic() {
+    if (listening) {
+      recRef.current?.stop();
+      return;
+    }
+    const rec = createRecognition();
+    if (!rec) {
+      setError("Voice input needs Chrome, Edge or Safari — typing works everywhere.");
+      return;
+    }
+    stopSpeaking();
+    recRef.current = rec;
+    rec.lang = navigator.language?.startsWith("en") ? navigator.language : "en-US";
+    rec.interimResults = true;
+    rec.continuous = false;
+    setError(null);
+    setInterim("");
+    setListening(true);
+
+    rec.onresult = (e) => {
+      let finalText = "";
+      let interimText = "";
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interimText += r[0].transcript;
+      }
+      setInterim(interimText);
+      if (finalText.trim()) {
+        setInterim("");
+        setListening(false);
+        rec.stop();
+        void send(finalText.trim(), true);
+      }
+    };
+    rec.onerror = () => {
+      setListening(false);
+      setInterim("");
+      setError("Didn't catch that — try the mic again, or just type.");
+    };
+    rec.onend = () => {
+      setListening(false);
+      setInterim("");
+    };
+    rec.start();
+  }
+
+  /* ---------- asking ---------- */
+
+  async function send(text: string, spoken = false) {
     const question = text.trim();
     if (!question || busy) return;
+    const wantVoice = spoken || voiceReplies;
     setError(null);
     setInput("");
     setBusy(true);
+    setLatency(null);
+    stopSpeaking();
+    spokenChars.current = 0;
 
     const history: Msg[] = [...messages, { role: "user", content: question }];
     setMessages([...history, { role: "assistant", content: "" }]);
 
     const controller = new AbortController();
     abortRef.current = controller;
+    const t0 = performance.now();
+    let firstToken = 0;
+    let firstAudio = 0;
+    const onFirstAudio = () => {
+      if (!firstAudio) {
+        firstAudio = Math.round(performance.now() - t0);
+        setLatency({ token: firstToken, audio: firstAudio });
+      }
+    };
 
     try {
       const res = await fetch("/api/chat", {
@@ -61,24 +229,27 @@ export default function AgentSection() {
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        if (!firstToken && acc.trim()) {
+          firstToken = Math.round(performance.now() - t0);
+          setLatency({ token: firstToken });
+        }
         const snapshot = acc;
-        setMessages([
-          ...history,
-          { role: "assistant", content: snapshot },
-        ]);
+        setMessages([...history, { role: "assistant", content: snapshot }]);
+        if (wantVoice) speakProgress(acc, false, onFirstAudio);
       }
-      if (!acc.trim()) {
-        throw new Error("Empty response — try again.");
-      }
+      if (!acc.trim()) throw new Error("Empty response — try again.");
+      if (wantVoice) speakProgress(acc, true, onFirstAudio);
     } catch (e) {
       if ((e as Error).name !== "AbortError") {
         setError((e as Error).message);
-        setMessages(history); // drop the empty assistant bubble
+        setMessages(history);
       }
     } finally {
       setBusy(false);
     }
   }
+
+  /* ---------- UI ---------- */
 
   return (
     <section id="agent" className="border-t border-line bg-bg2/30">
@@ -99,21 +270,45 @@ export default function AgentSection() {
           delay={120}
           className="mt-6 max-w-[52ch] text-[15.5px] leading-relaxed text-ink2"
         >
-          I build retrieval-grounded agents for a living — so this site has
-          one. Ask it anything about my work. Every answer is grounded in my
-          résumé and case studies, nothing invented.
+          I build retrieval-grounded voice agents for a living — so this site
+          has one. Type, or press the mic and ask out loud: it answers in
+          text and speech, and shows you the latency receipts.
         </Reveal>
 
         <Reveal delay={180} className="mt-12">
           <div className="overflow-hidden rounded-2xl border border-line bg-bg">
             {/* header */}
-            <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
               <p className="font-mono text-[11px] tracking-[0.22em] text-mut">
                 PORTFOLIO_AGENT
               </p>
-              <p className="hidden font-mono text-[11px] tracking-[0.1em] text-mut sm:block">
-                grounded · Llama 3.3 on Groq
-              </p>
+              <div className="flex items-center gap-4 font-mono text-[11px] text-mut">
+                {latency && (
+                  <span className="hidden text-acc2 sm:block">
+                    ⚡ {latency.token}ms first token
+                    {latency.audio ? ` · ${latency.audio}ms to voice` : ""}
+                  </span>
+                )}
+                {speaking ? (
+                  <button
+                    onClick={stopSpeaking}
+                    className="text-ink transition-colors hover:text-acc2"
+                  >
+                    ■ STOP VOICE
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setVoiceReplies((v) => !v)}
+                    aria-pressed={voiceReplies}
+                    className={`transition-colors ${
+                      voiceReplies ? "text-acc2" : "hover:text-ink"
+                    }`}
+                    title="Speak all replies aloud"
+                  >
+                    {voiceReplies ? "VOICE ON" : "VOICE OFF"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* transcript */}
@@ -125,7 +320,7 @@ export default function AgentSection() {
               {messages.length === 0 && (
                 <div className="m-auto flex max-w-md flex-col items-center gap-5 text-center">
                   <p className="text-sm text-mut">
-                    Try one of these, or ask your own —
+                    Try one of these, or press the mic and just ask —
                   </p>
                   <div className="flex flex-wrap justify-center gap-2.5">
                     {SUGGESTIONS.map((s) => (
@@ -147,7 +342,7 @@ export default function AgentSection() {
                   className={
                     m.role === "user"
                       ? "ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-acc/15 px-4 py-3 text-[14.5px] leading-relaxed text-ink"
-                      : "mr-auto max-w-[92%] text-[14.5px] leading-[1.8] text-ink2 whitespace-pre-wrap"
+                      : "mr-auto max-w-[92%] whitespace-pre-wrap text-[14.5px] leading-[1.8] text-ink2"
                   }
                 >
                   {m.content ||
@@ -170,24 +365,59 @@ export default function AgentSection() {
 
             {/* input */}
             <form
-              className="flex items-center gap-3 border-t border-line px-4 py-3.5"
+              className="flex items-center gap-2.5 border-t border-line px-4 py-3.5"
               onSubmit={(e) => {
                 e.preventDefault();
                 send(input);
               }}
             >
+              <button
+                type="button"
+                onClick={toggleMic}
+                aria-label={listening ? "Stop listening" : "Ask by voice"}
+                className={`relative flex h-11 w-11 flex-none items-center justify-center rounded-full border transition-colors ${
+                  listening
+                    ? "border-acc bg-acc/15 text-acc2"
+                    : "border-line-strong text-ink2 hover:border-acc hover:text-acc2"
+                }`}
+              >
+                {listening && (
+                  <span className="absolute inset-0 animate-ping rounded-full border border-acc opacity-40" />
+                )}
+                <svg
+                  width="17"
+                  height="17"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                >
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0" />
+                  <path d="M12 18v3" />
+                </svg>
+              </button>
+
               <input
-                value={input}
+                value={listening && interim ? interim : input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about my work, stack, or how something was built…"
+                placeholder={
+                  listening
+                    ? "Listening…"
+                    : "Ask about my work, stack, or how something was built…"
+                }
                 aria-label="Ask the portfolio agent a question"
                 maxLength={1500}
-                className="min-w-0 flex-1 bg-transparent px-2 py-2 text-[14.5px] text-ink placeholder:text-mut focus:outline-none"
+                readOnly={listening}
+                className={`min-w-0 flex-1 bg-transparent px-2 py-2 text-[14.5px] placeholder:text-mut focus:outline-none ${
+                  listening && interim ? "italic text-acc2" : "text-ink"
+                }`}
               />
               <button
                 type="submit"
-                disabled={busy || !input.trim()}
-                className="rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bg transition-all enabled:hover:bg-acc2 disabled:opacity-40"
+                disabled={busy || listening || !input.trim()}
+                className="rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bg transition-all enabled:hover:bg-acc2 enabled:active:scale-95 disabled:opacity-40"
               >
                 {busy ? "…" : "Ask"}
               </button>
@@ -195,8 +425,9 @@ export default function AgentSection() {
           </div>
 
           <p className="mt-4 font-mono text-[11px] leading-relaxed tracking-wide text-mut">
-            Answers are grounded in my résumé and case studies. If it doesn&apos;t
-            know, it says so — that&apos;s the point.{" "}
+            Answers are grounded in my résumé and case studies. If it
+            doesn&apos;t know, it says so — that&apos;s the point. Voice input
+            works in Chrome, Edge and Safari.{" "}
             <a href={`mailto:${profile.email}`} className="text-acc2">
               Prefer a human? Email me.
             </a>

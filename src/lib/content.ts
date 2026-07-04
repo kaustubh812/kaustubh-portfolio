@@ -19,6 +19,10 @@ export const profile = {
     "RAG, agentic and voice systems in production at GE HealthCare. Three shipped in 10 months, solo, on a regulated medical-device network.",
   summary:
     "AI Engineer at GE HealthCare who shipped three production AI systems in 10 months — solo, on a regulated medical-device network. The agentic AI workspace was adopted by over 50% of the engineering team and drove 30%+ efficiency gains. Full-stack ownership across architecture, backend, frontend, and deployment.",
+  philosophy:
+    "All three GE HealthCare systems share one engineering practice: fully offline on local hardware (Qdrant, Ollama, BGE-M3, LangGraph as a consistent stack, so one corpus and one model upgrade serves all three), and layered defenses that never single-shot-trust an LLM — cheap deterministic gates run before expensive LLM judges, and the expensive calls only happen after the cheap checks pass. Fail-fast, auditable, built for zero-touch teammate deployment.",
+  seeking:
+    "Open to IC roles on strong AI/GenAI teams — owning a retrieval system, generation pipeline or agent platform end-to-end (architecture, eval harness, roadmap). Bengaluru, or remote/hybrid within India. The work he wants is the unglamorous half of applied AI: retrieval failure modes, structured-output reliability, layered hallucination defense, eval-first iteration.",
   about: [
     "I'm an AI/LLM engineer at GE HealthCare with full-stack ownership across architecture, backend, frontend and deployment. I design secure, on-premise RAG and agentic systems that run fully offline on regulated medical-device networks — no cloud APIs, no shortcuts.",
     "My work centres on retrieval done right — hybrid search, reranking, source-grounded answers — plus real-time voice agents and multi-agent orchestration. I care about the unglamorous parts: eval pipelines, latency budgets, audit logging, and output that enters review ready to approve, not ready to fix.",
@@ -169,6 +173,8 @@ export type Project = {
   decisions: { title: string; body: string }[];
   outcomes: string[];
   links?: { label: string; href: string }[];
+  /** Extra technical depth for the agent's grounding context — not rendered on pages. */
+  agentNotes?: string[];
 };
 
 export const projects: Project[] = [
@@ -250,6 +256,12 @@ export const projects: Project[] = [
       "Grew from a RAG assistant into the team's default AI workspace — chat, voice, code generation, notes and admin controls.",
       "Owned end-to-end by one engineer: architecture, backend, frontend, deployment and operations.",
     ],
+    agentNotes: [
+      "Multimodal inputs: text, voice and vision. Voice transcription runs on faster-whisper locally; images are understood via llama3.2-vision plus EasyOCR; documents are parsed structure-aware with Docling.",
+      "Retrieval detail: BM25 sparse and BGE-M3 dense results are fused with reciprocal rank fusion, then re-scored by a bge-reranker-v2-m3 cross-encoder with separately calibrated accept thresholds for prose versus tables.",
+      "Local inference via Ollama (qwen2.5 family). Around 100 unit tests plus red-team scripts. Served to the team over the corporate LAN through Nginx with TLS, designed for zero-touch teammate onboarding.",
+      "Production hardening: a streaming loop detector that kills pathological generation, a phantom-citation stripper that removes references the model invented, and cancel-safe persistence so closing a tab mid-answer never corrupts a conversation thread.",
+    ],
   },
   {
     slug: "testmatrix-ai",
@@ -316,6 +328,13 @@ export const projects: Project[] = [
       "Test cases enter human review ready to approve rather than ready to fix.",
       "Consistent, compliant output format across runs — the property regulated teams actually need from AI tooling.",
     ],
+    agentNotes: [
+      "The layered defense pipeline, ordered by cost: a deterministic lexical hallucination filter (identifier tokens in generated steps must appear in retrieved context; a suppression list keeps domain verbs like verify/measure from false-positiving; the overlap threshold of 0.88 was tuned empirically) → a two-call LLM verification judge (advisory) → a regex/structural quality gate that hard-fails on missing fields, coverage gaps or duplicate IDs → five guardrails (PII, injection, toxicity, secrets, language) with medical-domain false-positive suppression so terms like 'syringe' or 'patient ID' don't block legitimate test cases → a seven-metric weighted evaluation where faithfulness carries the highest weight (0.25) → a human review queue.",
+      "Generation runs on deepseek-r1:14b with strict JSON via Pydantic schemas. Its <think> reasoning blocks broke every JSON parser at first — the fix was centralising the strip in one utility plus three-layer JSON extraction (strip think-blocks, strip markdown fences, extract the outermost balanced object).",
+      "Chunking is sentence-aware and token-budgeted (~220 tokens with 50-token overlap, word-level fallback for oversize sentences); context packs are budgeted to 8k tokens with tiktoken.",
+      "When a reviewer requests regeneration, the entire pipeline re-runs in a single database transaction that replaces all prior verification/quality/eval/guardrail rows — so the audit trail always reflects the current asset, never a mix of old and new.",
+      "What he'd improve next, in his own words: use a separate model as the verification judge instead of the generator model (to break error correlation), and add retrieval-level evals with ground-truth chunk sets.",
+    ],
   },
   {
     slug: "atlas-ai",
@@ -381,6 +400,13 @@ export const projects: Project[] = [
     outcomes: [
       "Full 50+ page specification drafts in under 10 minutes, from a brief that takes minutes to write.",
       "Compressed a weeks-long engineering writing task into a same-morning task.",
+    ],
+    agentNotes: [
+      "Architecture: a seven-node compiled LangGraph state graph — plan → draft all sections in parallel (asyncio.gather against local Ollama) → consistency check → hallucination check → compliance check → assemble → render to DOCX. The critic/reviser loop lives inside the drafting node: a phi4 critic scores each section on a five-axis rubric and a one-shot reviser triggers only below 3.5, which bounds worst-case cost.",
+      "Three local models with distinct jobs: qwen2.5:14b drafts with Ollama's JSON-schema structured output, phi4 judges (deliberately a different model family than the drafter, to avoid correlated scoring), and deepseek-r1 handles reasoning-heavy planning.",
+      "Requirement IDs are allocated in atomic blocks by a driver-aware allocator — an asyncio lock on SQLite, SELECT FOR UPDATE on Postgres — so parallel section drafting never produces colliding IDs. A three-layer parse defense (markdown-fence strip → Pydantic schema validation → hard intersection with the allocated-ID set) drops any hallucinated ID before it reaches the database.",
+      "Compliance is a YAML rules engine with three rule kinds (regex, presence, LLM-rubric) — 17 rules that regulatory experts can edit without a code deploy. Consistency and hallucination checks are deliberately pure Python, not LLM judges: deterministic and audit-friendly.",
+      "Cross-document traceability (design → system → software requirements) is modelled as a NetworkX directed graph and rendered live in the UI with React Flow; generated documents cite IEC 60601, IEC 62304, ISO 13485, ISO 14971 and FDA 21 CFR. Roughly 1,000 lines of pytest across the pipeline.",
     ],
   },
   {
@@ -524,7 +550,18 @@ export function buildAgentContext(): string {
       `Outcomes: ${pr.outcomes.join(" ")}`,
       `Metrics: ${pr.metrics.map((m) => `${m.value} ${m.label}`).join("; ")}`
     );
+    if (pr.agentNotes?.length) {
+      lines.push(`Technical depth: ${pr.agentNotes.join(" ")}`);
+    }
   }
+  lines.push(
+    ``,
+    `## Engineering philosophy`,
+    p.philosophy,
+    ``,
+    `## What he's looking for`,
+    p.seeking
+  );
   lines.push(
     ``,
     `## Skills`,
