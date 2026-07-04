@@ -2,7 +2,7 @@
 
 Personal portfolio of **Kaustubh Watane** — AI/LLM Engineer at GE HealthCare.
 
-Live site: coming soon · [LinkedIn](https://www.linkedin.com/in/kaustubh-watane-6135b41a3)
+**Live: [kaustubh-portfolio-xi.vercel.app](https://kaustubh-portfolio-xi.vercel.app)** · [LinkedIn](https://www.linkedin.com/in/kaustubh-watane-6135b41a3)
 
 ## The idea
 
