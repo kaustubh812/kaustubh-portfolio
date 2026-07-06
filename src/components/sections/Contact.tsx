@@ -3,8 +3,12 @@ import { profile } from "@/lib/content";
 
 export default function Contact() {
   return (
-    <section id="contact" className="border-t border-line">
-      <div className="container-x flex flex-col items-center py-32 text-center sm:py-44">
+    <section id="contact" className="relative border-t border-line">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(820px_520px_at_50%_42%,rgba(139,124,255,0.12),transparent_70%)]"
+      />
+      <div className="container-x relative flex flex-col items-center py-32 text-center sm:py-44">
         <Reveal as="p" className="eyebrow" >
           Contact
         </Reveal>
@@ -19,7 +23,7 @@ export default function Contact() {
         <Reveal delay={140}>
           <a
             href={`mailto:${profile.email}`}
-            className="mt-10 inline-block rounded-full bg-ink px-8 py-4 text-sm font-medium text-bg transition-colors hover:bg-acc2"
+            className="btn-acc mt-10 inline-block rounded-full px-8 py-4 text-sm font-medium"
           >
             {profile.email}
           </a>

@@ -7,6 +7,17 @@ import { profile, projects } from "@/lib/content";
 
 const titleBySlug = Object.fromEntries(projects.map((p) => [p.slug, p.title]));
 
+/* each discipline gets its own hue so the wall of chips reads as a map,
+   not a monochrome list */
+const TINTS: Record<string, string> = {
+  "AI / LLM": "139, 124, 255", // violet
+  "Voice AI": "103, 232, 249", // cyan
+  Backend: "255, 184, 107", // amber
+  "Frontend / Mobile": "244, 154, 193", // rose
+  "Deployment / LLMOps": "126, 231, 168", // mint
+};
+const FALLBACK_TINT = "139, 124, 255";
+
 /** Skills as evidence: hover a chip to see where it's proven in production. */
 export default function Toolkit() {
   const [hover, setHover] = useState<{ g: number; i: number } | null>(null);
@@ -25,8 +36,9 @@ export default function Toolkit() {
         it&apos;s proven in production.
       </Reveal>
 
-      <div className="mt-12 flex flex-col">
+      <div className="mt-10 flex flex-col">
         {profile.skills.map((s, gi) => {
+          const tint = TINTS[s.group] ?? FALLBACK_TINT;
           const active = hover?.g === gi ? s.items[hover.i] : null;
           const hasEvidence =
             !!active && (("in" in active && active.in?.length) || ("note" in active && active.note));
@@ -34,9 +46,12 @@ export default function Toolkit() {
             <Reveal
               key={s.group}
               delay={Math.min(gi * 50, 150)}
-              className="grid grid-cols-1 gap-4 border-t border-line py-8 last:border-b sm:grid-cols-[220px_1fr] sm:gap-10"
+              className="grid grid-cols-1 gap-4 border-t border-line py-6 last:border-b sm:grid-cols-[220px_1fr] sm:gap-10"
             >
-              <h3 className="pt-2 font-mono text-xs tracking-[0.25em] text-acc2">
+              <h3
+                className="pt-2 font-mono text-xs tracking-[0.25em]"
+                style={{ color: `rgb(${tint})` }}
+              >
                 {s.group.toUpperCase()}
               </h3>
               <div>
@@ -52,10 +67,20 @@ export default function Toolkit() {
                         onFocus={() => setHover({ g: gi, i: ii })}
                         onBlur={() => setHover(null)}
                         className={`cursor-default rounded-full border px-3.5 py-1.5 text-[13px] transition-all duration-300 ${
-                          lit
-                            ? "-translate-y-0.5 border-acc bg-acc/10 text-ink shadow-[0_8px_30px_-8px_rgba(139,124,255,0.45)]"
-                            : "border-line text-ink2"
+                          lit ? "-translate-y-0.5 text-ink" : "text-ink2"
                         }`}
+                        style={
+                          lit
+                            ? {
+                                borderColor: `rgba(${tint}, 0.85)`,
+                                background: `rgba(${tint}, 0.14)`,
+                                boxShadow: `0 8px 30px -8px rgba(${tint}, 0.45)`,
+                              }
+                            : {
+                                borderColor: `rgba(${tint}, 0.3)`,
+                                background: `rgba(${tint}, 0.05)`,
+                              }
+                        }
                       >
                         {it.name}
                       </span>

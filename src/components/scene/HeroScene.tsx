@@ -68,7 +68,7 @@ const fragment = /* glsl */ `
     vec3 cyan   = vec3(0.404, 0.910, 0.976);
     vec3 color  = mix(violet, cyan, smoothstep(0.35, 0.95, vMix));
 
-    gl_FragColor = vec4(color, soft * vFade * 0.5);
+    gl_FragColor = vec4(color, soft * vFade * 0.62);
   }
 `;
 
@@ -163,6 +163,9 @@ export default function HeroScene() {
       </Canvas>
       {/* readability veil over the text side */}
       <div className="absolute inset-0 bg-[radial-gradient(1000px_700px_at_25%_45%,rgba(8,8,13,0.72),transparent_65%)]" />
+      {/* nebula glow over the open side of the frame */}
+      <div className="absolute inset-0 bg-[radial-gradient(950px_650px_at_74%_32%,rgba(139,124,255,0.14),transparent_62%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(750px_550px_at_88%_82%,rgba(103,232,249,0.07),transparent_62%)]" />
       <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-bg" />
     </div>
   );

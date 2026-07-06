@@ -354,8 +354,12 @@ export default function AgentSection() {
   /* ---------- UI ---------- */
 
   return (
-    <section id="agent" className="border-t border-line bg-bg2/30">
-      <div className="container-x py-28 sm:py-36">
+    <section id="agent" className="relative border-t border-line bg-bg2/30">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(900px_560px_at_50%_62%,rgba(139,124,255,0.09),transparent_70%)]"
+      />
+      <div className="container-x relative py-28 sm:py-36">
         <Reveal as="p" className="eyebrow">
           The live demo
         </Reveal>
@@ -378,11 +382,18 @@ export default function AgentSection() {
         </Reveal>
 
         <Reveal delay={180} className="mt-12">
-          <div className="overflow-hidden rounded-2xl border border-line bg-bg">
+          <div className="overflow-hidden rounded-2xl border border-acc/25 bg-bg shadow-[0_0_90px_-25px_rgba(139,124,255,0.45)]">
             {/* header */}
-            <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
-              <p className="font-mono text-[11px] tracking-[0.22em] text-mut">
+            <div className="flex items-center justify-between gap-3 border-b border-line bg-gradient-to-r from-acc/[0.07] to-transparent px-5 py-3.5">
+              <p className="flex items-center gap-2.5 font-mono text-[11px] tracking-[0.22em] text-mut">
+                <span className="relative flex h-2 w-2" aria-hidden>
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
                 PORTFOLIO_AGENT
+                <span className="hidden text-emerald-400/90 sm:inline">
+                  · ONLINE
+                </span>
               </p>
               <div className="flex items-center gap-4 font-mono text-[11px] text-mut">
                 {latency && (
@@ -425,13 +436,18 @@ export default function AgentSection() {
               </div>
             </div>
 
-            {/* transcript — data-lenis-prevent keeps Lenis from hijacking
-                its wheel/touch events; overscroll-contain stops the page
+            {/* transcript — wheel/touch stays with the page until a
+                conversation exists; then the panel owns it: data-lenis-prevent
+                keeps Lenis from hijacking, overscroll-contain stops the page
                 from scrolling when the transcript reaches its ends */}
             <div
               ref={scrollRef}
-              data-lenis-prevent
-              className="flex h-[380px] flex-col gap-5 overflow-y-auto overscroll-contain scroll-smooth px-5 py-6 sm:px-7"
+              data-lenis-prevent={messages.length > 0 ? "" : undefined}
+              className={`flex h-[380px] flex-col gap-5 scroll-smooth px-5 py-6 sm:px-7 ${
+                messages.length > 0
+                  ? "overflow-y-auto overscroll-contain"
+                  : "overflow-hidden"
+              }`}
               aria-live="polite"
             >
               {messages.length === 0 && (
@@ -444,7 +460,7 @@ export default function AgentSection() {
                       <button
                         key={s}
                         onClick={() => send(s)}
-                        className="rounded-full border border-line px-4 py-2 text-[13px] text-ink2 transition-colors hover:border-acc hover:text-acc2"
+                        className="rounded-full border border-acc/30 bg-acc/[0.06] px-4 py-2 text-[13px] text-acc2 transition-colors hover:border-acc hover:bg-acc/15 hover:text-ink"
                       >
                         {s}
                       </button>
@@ -551,7 +567,7 @@ export default function AgentSection() {
               <button
                 type="submit"
                 disabled={busy || listening || !input.trim()}
-                className="rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-bg transition-all enabled:hover:bg-acc2 enabled:active:scale-95 disabled:opacity-40"
+                className="btn-acc rounded-full px-5 py-2.5 text-sm font-medium enabled:active:scale-95 disabled:opacity-40 disabled:shadow-none"
               >
                 {busy ? "…" : "Ask"}
               </button>

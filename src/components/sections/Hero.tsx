@@ -67,7 +67,7 @@ export default function Hero() {
         <div data-hero className="mt-11 flex flex-wrap gap-4 opacity-0">
           <a
             href="#agent"
-            className="group rounded-full bg-ink px-6 py-3 text-sm font-medium text-bg transition-colors hover:bg-acc2"
+            className="btn-acc group rounded-full px-6 py-3 text-sm font-medium"
           >
             Interrogate my portfolio{" "}
             <span className="inline-block transition-transform group-hover:translate-x-1">

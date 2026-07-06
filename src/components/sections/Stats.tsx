@@ -11,7 +11,7 @@ export default function Stats() {
             delay={i * 80}
             className="flex flex-col gap-3 border-line px-2 py-12 sm:px-6 lg:border-l lg:first:border-l-0"
           >
-            <span className="text-[clamp(36px,4.5vw,64px)] font-semibold leading-none tracking-[-0.02em] text-ink">
+            <span className="grad-num text-[clamp(36px,4.5vw,64px)] font-semibold leading-none tracking-[-0.02em]">
               {s.value}
             </span>
             <span className="max-w-[24ch] text-sm leading-snug text-mut">

@@ -49,8 +49,19 @@ function badRequest(msg: string) {
   return Response.json({ error: msg }, { status: 400 });
 }
 
+/** Primary key first; the backup only steps in when the primary is
+    exhausted or rejected (free-tier quota, expiry, revocation). */
+function apiKeys(): string[] {
+  return [process.env.GROQ_API_KEY, process.env.GROQ_API_KEY_BACKUP].filter(
+    (k): k is string => !!k
+  );
+}
+
+// statuses a different key can actually cure
+const KEY_FALLBACK_STATUSES = new Set([401, 403, 429]);
+
 export async function POST(req: Request) {
-  if (!process.env.GROQ_API_KEY) {
+  if (apiKeys().length === 0) {
     return Response.json(
       {
         error:
@@ -97,16 +108,27 @@ export async function POST(req: Request) {
     return badRequest("Last message must be from the user.");
   }
 
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  let completion: Awaited<
+    ReturnType<Groq["chat"]["completions"]["create"]>
+  > | null = null;
+  for (const key of apiKeys()) {
+    try {
+      completion = await new Groq({ apiKey: key }).chat.completions.create({
+        model: MODEL,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...clean],
+        temperature: 0.6,
+        max_tokens: 700,
+        stream: true,
+      });
+      break;
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      if (!status || !KEY_FALLBACK_STATUSES.has(status)) break;
+    }
+  }
 
   try {
-    const completion = await groq.chat.completions.create({
-      model: MODEL,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...clean],
-      temperature: 0.6,
-      max_tokens: 700,
-      stream: true,
-    });
+    if (!completion) throw new Error("all keys failed");
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

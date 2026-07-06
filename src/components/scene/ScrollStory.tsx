@@ -229,19 +229,19 @@ const vertex = /* glsl */ `
     float dim = (1.0 - aFlag.x) * smoothstep(2.25, 2.95, uP);
     float gone = (1.0 - aFlag.z) * ez(clamp((uP - 3.05) / 0.65, 0.0, 1.0));
 
-    vec3 paper  = vec3(0.72, 0.71, 0.86);
+    vec3 paper  = vec3(0.79, 0.78, 0.93);
     vec3 violet = vec3(0.545, 0.486, 1.0);
     vec3 cyan   = vec3(0.404, 0.910, 0.976);
     vec3 lit    = vec3(0.80, 0.76, 1.0);
     vec3 clusterColor = mix(violet, cyan, aFlag.y);
     vColor = mix(mix(paper, clusterColor, e2), lit, hl * 0.75);
 
-    vAlpha = 0.62 * (1.0 - dim * 0.82) * (1.0 - gone);
+    vAlpha = 0.78 * (1.0 - dim * 0.82) * (1.0 - gone);
     vAlpha = mix(vAlpha, 0.5, beam);
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * mv;
-    gl_PointSize = (1.05 + aSeed * 1.15) * (1.0 + hl * 0.45) * (30.0 / -mv.z);
+    gl_PointSize = (1.2 + aSeed * 1.25) * (1.0 + hl * 0.45) * (30.0 / -mv.z);
   }
 `;
 

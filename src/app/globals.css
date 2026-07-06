@@ -4,12 +4,14 @@
   --bg: #08080d;
   --bg2: #0d0d16;
   --ink: #f0eff6;
-  --ink2: #b4b1c5;
-  --mut: #7c7990;
+  --ink2: #bfbcd2;
+  --mut: #908da8;
   --acc: #8b7cff;
   --acc2: #b9adff;
-  --line: rgba(163, 152, 255, 0.13);
-  --line-strong: rgba(163, 152, 255, 0.28);
+  --cyan: #67e8f9;
+  --warm: #ffb86b;
+  --line: rgba(163, 152, 255, 0.16);
+  --line-strong: rgba(163, 152, 255, 0.33);
 }
 
 @theme inline {
@@ -20,6 +22,8 @@
   --color-mut: var(--mut);
   --color-acc: var(--acc);
   --color-acc2: var(--acc2);
+  --color-cyan: var(--cyan);
+  --color-warm: var(--warm);
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
   --font-sans: var(--font-geist-sans);
@@ -83,6 +87,29 @@ body {
   font-weight: 400;
   letter-spacing: 0;
   color: var(--acc2);
+}
+
+/* primary call-to-action: the one loud violet on every screen */
+.btn-acc {
+  background: linear-gradient(135deg, #9587ff, #6a56f5);
+  color: #fff;
+  box-shadow: 0 10px 36px -12px rgba(139, 124, 255, 0.65);
+  transition:
+    box-shadow 0.3s,
+    filter 0.3s,
+    transform 0.3s;
+}
+.btn-acc:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 12px 44px -12px rgba(139, 124, 255, 0.85);
+}
+
+/* big display numbers pick up the site gradient */
+.grad-num {
+  background: linear-gradient(100deg, #cfc7ff 0%, #8b7cff 55%, #67e8f9 115%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* work cards: ignited by the serpentine path as it draws (md+ only) */

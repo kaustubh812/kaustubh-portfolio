@@ -69,7 +69,7 @@ export default function Nav() {
         open
           ? "border-b border-line bg-bg"
           : scrolled
-            ? "border-b border-line bg-bg/70 backdrop-blur-md"
+            ? "border-b border-line bg-bg/85 backdrop-blur-md"
             : "border-b border-transparent"
       }`}
     >

@@ -139,7 +139,12 @@ export default function Work() {
   }, [geo]);
 
   return (
-    <section id="work" className="container-x py-28 sm:py-36">
+    <section id="work" className="relative py-28 sm:py-36">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(640px_420px_at_18%_0%,rgba(139,124,255,0.1),transparent_70%)]"
+      />
+      <div className="container-x relative">
       <Reveal as="p" className="eyebrow">
         Selected work
       </Reveal>
@@ -180,7 +185,7 @@ export default function Work() {
             <path
               d={geo.d}
               stroke="url(#wk-grad)"
-              strokeOpacity="0.1"
+              strokeOpacity="0.18"
               strokeWidth="1.5"
             />
             {/* the drawn line */}
@@ -249,7 +254,7 @@ export default function Work() {
                   {p.stack.slice(0, 4).join(" · ")}
                 </p>
                 <p className="mt-3 border-t border-line pt-4 text-sm text-ink2">
-                  <span className="font-semibold text-acc2">
+                  <span className="font-semibold text-warm">
                     {p.metrics[0].value}
                   </span>{" "}
                   {p.metrics[0].label}
@@ -258,6 +263,7 @@ export default function Work() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </section>
   );
