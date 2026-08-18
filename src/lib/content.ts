@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Single source of truth for all portfolio content.
  * Rendered by the site AND serialized into the agent's grounding context,
  * so the pages and the AI never drift apart.
@@ -115,27 +115,27 @@ export const profile = {
       items: [
         {
           name: "Python",
-          in: ["nebula-ai", "testmatrix-ai", "atlas-ai", "luna-ai"],
+          in: ["nebula-ai", "testmatrix-ai", "atlas-ai", "luna-ai", "netra-ai"],
         },
-        { name: "FastAPI", in: ["nebula-ai", "luna-ai"] },
+        { name: "FastAPI", in: ["nebula-ai", "luna-ai", "netra-ai"] },
         { name: "SQLAlchemy", in: ["nebula-ai", "luna-ai"] },
         { name: "Alembic", in: ["nebula-ai"] },
         { name: "Pydantic", in: ["nebula-ai", "luna-ai"] },
         { name: "Node.js" },
         { name: "PostgreSQL", in: ["nebula-ai", "luna-ai"] },
         { name: "Qdrant", in: ["nebula-ai"] },
-        { name: "REST APIs", in: ["luna-ai", "spenzy-ai"] },
+        { name: "REST APIs", in: ["luna-ai", "netra-ai"] },
       ],
     },
     {
       group: "Frontend / Mobile",
       items: [
-        { name: "TypeScript", in: ["nebula-ai"], note: "and this very website" },
+        { name: "TypeScript", in: ["nebula-ai", "netra-ai"], note: "and this very website" },
         { name: "React", in: ["nebula-ai"] },
         { name: "React Native", in: ["luna-ai"] },
         { name: "Expo", in: ["luna-ai"] },
-        { name: "Flutter", in: ["spenzy-ai"] },
-        { name: "Next.js", note: "this very website" },
+        { name: "Flutter" },
+        { name: "Next.js", in: ["netra-ai"], note: "and this very website" },
         { name: "Three.js / WebGL", note: "this very website" },
       ],
     },
@@ -494,43 +494,81 @@ export const projects: Project[] = [
     ],
   },
   {
-    slug: "spenzy-ai",
+    slug: "netra-ai",
     index: "05",
     org: "Personal",
     confidential: false,
-    title: "Spenzy AI",
-    tagline: "Natural-language expense tracking in Flutter",
+    title: "Netra AI",
+    tagline: "Bloomberg Terminal-grade trading intelligence for Indian equity markets",
     description:
-      "Smart expense tracker with AI-powered financial analysis — spending categorization, budgets and conversational summaries powered by GPT, built in Flutter.",
-    period: "2024",
-    role: "Solo — design, build, ship",
-    stack: ["Flutter", "Dart", "OpenAI API"],
+      "Full-stack quantitative trading signal platform for NSE/NIFTY 50 — Optuna-tuned XGBoost signals, 15+ technical indicators, realistic backtesting with Indian market costs, and a Bloomberg Terminal-style dark UI built with Next.js 15 and TradingView charts.",
+    period: "2025 — present",
+    role: "Solo — architecture, ML, backend, frontend",
+    stack: ["Python", "FastAPI", "XGBoost", "Optuna", "Next.js 15", "TypeScript", "TailwindCSS", "TradingView Charts", "SQLite"],
     metrics: [
-      { value: "NL", label: "natural-language expense analysis" },
-      { value: "Real-time", label: "spending insights" },
+      { value: "15+", label: "technical indicators (RSI, MACD, Supertrend, ADX, VWAP)" },
+      { value: "50", label: "NIFTY 50 stocks tracked with live BUY/SELL/HOLD signals" },
+      { value: "Bloomberg-grade", label: "trading terminal UI with real-time candlestick charts" },
     ],
     problem:
-      "Expense trackers die because logging is tedious and insights are generic. The bet: natural language in, conversational insight out.",
+      "Indian retail traders lack a unified, ML-powered signal engine that combines quantitative modelling with professional-grade charting and realistic backtesting — most tools are either too simple or locked behind expensive subscriptions.",
     approach: [
-      "Built expense logging, spending categorization and budget tracking in Flutter with a responsive mobile UI.",
-      "Wired GPT into the analysis path for conversational financial summaries and personalized budget recommendations.",
+      "Engineered a multi-factor composite signal engine: an Optuna-tuned XGBoost classifier (time-series cross-validation, not random split) blended with Supertrend direction, RSI zone, MACD crossover state, and volume confirmation — weights 40/20/15/15/10.",
+      "Built a quantitative backtesting engine with realistic Indian market costs: Zerodha-style ₹20/order brokerage, STT 0.025%, GST 18%, SEBI charges, and stamp duty — reporting Sharpe ratio, max drawdown, and win rate.",
+      "Designed a Bloomberg Terminal-style dark UI with TradingView Lightweight Charts for real-time candlestick rendering with BUY/SELL marker overlays, NSE option chain PCR tracking, market breadth indicators, and an AI-powered daily market brief.",
+      "Added an advanced analytics layer: anomaly detection (z-score volume spikes), AI stock screener (natural language to structured filters via GPT), smart multi-condition alert builder, sector rotation analysis, and paper trading with P and L tracking.",
     ],
     diagram: {
-      title: "Conversational finance loop",
+      title: "Signal generation pipeline",
       lanes: [
-        { title: "Input", nodes: [{ label: "Expenses + questions", sub: "natural language" }] },
-        { title: "App", nodes: [{ label: "Flutter client", sub: "categorization · budgets" }] },
-        { title: "AI", nodes: [{ label: "GPT analysis", sub: "summaries · recommendations" }] },
+        {
+          title: "Data",
+          nodes: [
+            { label: "yfinance + NSE", sub: "OHLCV · option chain · FII/DII" },
+          ],
+        },
+        {
+          title: "ML Engine",
+          nodes: [
+            { label: "XGBoost (Optuna-tuned)", sub: "time-series CV · per-stock models" },
+            { label: "Composite signal", sub: "XGBoost · Supertrend · RSI · MACD · Volume" },
+          ],
+        },
+        {
+          title: "API + UI",
+          nodes: [
+            { label: "FastAPI backend", sub: "REST endpoints · APScheduler" },
+            { label: "Next.js 15 dashboard", sub: "TradingView charts · Bloomberg terminal UI" },
+          ],
+        },
       ],
     },
     decisions: [
       {
-        title: "Conversation as the analytics UI",
-        body: "Instead of charts nobody reads, spending insight arrives as answers to questions users actually ask — 'where did my money go this month?'",
+        title: "Time-series split, never random",
+        body: "Training on data before 2024, testing on 2024–2025 — a random split would leak future information into the model and produce falsely optimistic accuracy numbers.",
+      },
+      {
+        title: "Composite over pure ML",
+        body: "Blending XGBoost with rules-based signals (Supertrend, RSI, MACD) provides interpretability and a fallback when the model is uncertain — traders need to understand why a signal fired.",
       },
     ],
     outcomes: [
-      "Shipped cross-platform with real-time spending insights and personalized recommendations.",
+      "Live Bloomberg Terminal-style trading dashboard tracking 50 NIFTY stocks with real-time BUY/SELL/HOLD signals, candlestick charts, and option chain PCR.",
+      "Full backtesting engine with realistic Indian market trading costs, reporting Sharpe ratio, max drawdown, and win rate across the 2024–2025 test period.",
+      "Open-sourced on GitHub: https://github.com/kaustubh812/Netra-AI",
+    ],
+    agentNotes: [
+      "The ML pipeline uses TimeSeriesSplit for cross-validation and Optuna for Bayesian hyperparameter optimisation of XGBoost — a deliberate choice to prevent data leakage that would inflate accuracy metrics.",
+      "The composite signal weights (XGBoost 40%, Supertrend 20%, RSI 15%, MACD 15%, Volume 10%) balance ML confidence with human-interpretable rule-based confirmation.",
+      "Backtesting includes all realistic Indian market frictions: Zerodha-style ₹20/order brokerage, 0.025% STT on sell side for delivery, 18% GST on brokerage, ₹10/crore SEBI charge, and 0.015% stamp duty on buy.",
+      "The UI is Bloomberg Terminal-inspired: dark charcoal background, JetBrains Mono for numbers, dense information layout with sortable signal tables, TradingView Lightweight Charts with indicator overlays.",
+    ],
+    links: [
+      {
+        label: "GitHub",
+        href: "https://github.com/kaustubh812/Netra-AI",
+      },
     ],
   },
 ];
@@ -603,3 +641,4 @@ export function buildAgentContext(): string {
   );
   return lines.join("\n");
 }
+
