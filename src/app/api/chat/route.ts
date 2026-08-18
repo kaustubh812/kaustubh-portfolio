@@ -3,12 +3,11 @@ import { buildAgentContext, profile } from "@/lib/content";
 
 export const runtime = "nodejs";
 
-// Model priority list — tried in order until one succeeds.
-// Free-tier production models, fastest first.
+// Model priority list - tried in order until one succeeds.
 const MODELS = [
-  "meta-llama/llama-4-scout-17b-16e-instruct", // Llama 4 Scout — fast, capable, production
-  "llama-3.3-70b-versatile",                   // Llama 3.3 70B — strong fallback
-  "llama-3.1-8b-instant",                      // Llama 3.1 8B — always-available backstop
+  "openai/gpt-oss-120b",  // GPT-OSS 120B - highest quality, primary
+  "openai/gpt-oss-20b",   // GPT-OSS 20B - fast fallback
+  "qwen/qwen3.6-27b",     // Qwen 3.6 27B - backstop
 ];
 const MAX_MESSAGES = 16;
 const MAX_CHARS = 1500;
