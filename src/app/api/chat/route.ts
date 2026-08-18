@@ -3,7 +3,13 @@ import { buildAgentContext, profile } from "@/lib/content";
 
 export const runtime = "nodejs";
 
-const MODEL = "llama-3.3-70b-versatile";
+// Model priority list — tried in order until one succeeds.
+// Free-tier production models, fastest first.
+const MODELS = [
+  "meta-llama/llama-4-scout-17b-16e-instruct", // Llama 4 Scout — fast, capable, production
+  "llama-3.3-70b-versatile",                   // Llama 3.3 70B — strong fallback
+  "llama-3.1-8b-instant",                      // Llama 3.1 8B — always-available backstop
+];
 const MAX_MESSAGES = 16;
 const MAX_CHARS = 1500;
 
@@ -113,14 +119,24 @@ export async function POST(req: Request) {
   > | null = null;
   for (const key of apiKeys()) {
     try {
-      completion = await new Groq({ apiKey: key }).chat.completions.create({
-        model: MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...clean],
-        temperature: 0.6,
-        max_tokens: 700,
-        stream: true,
-      });
-      break;
+      for (const model of MODELS) {
+        try {
+          completion = await new Groq({ apiKey: key }).chat.completions.create({
+            model,
+            messages: [{ role: "system", content: SYSTEM_PROMPT }, ...clean],
+            temperature: 0.6,
+            max_tokens: 700,
+            stream: true,
+          });
+          break; // model worked, stop trying models
+        } catch (modelErr) {
+          const mStatus = (modelErr as { status?: number })?.status;
+          // 400/404 = model not found/invalid, try next model. Others: re-throw.
+          if (mStatus === 400 || mStatus === 404) continue;
+          throw modelErr;
+        }
+      }
+      if (completion) break; // key + model combo worked, stop trying keys
     } catch (e) {
       const status = (e as { status?: number })?.status;
       if (!status || !KEY_FALLBACK_STATUSES.has(status)) break;
